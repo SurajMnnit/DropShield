@@ -1,0 +1,56 @@
+version: '3.8'
+
+# DropShield Distributed System Infrastructure
+# Phase 2 will fully configure persistent volumes, healthchecks, and resource limits.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dropshield-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dropshield}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - dropshield-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: dropshield-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - dropshield-net
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: dropshield-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"   # AMQP protocol
+      - "15672:15672" # Management dashboard
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - dropshield-net
+
+networks:
+  dropshield-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
