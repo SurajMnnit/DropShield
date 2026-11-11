@@ -25,6 +25,7 @@ const envSchema = z.object({
   POSTGRES_DB: z.string().default('dropshield'),
   POSTGRES_USER: z.string().default('postgres'),
   POSTGRES_PASSWORD: z.string().default('postgres'),
+  DATABASE_URL: z.string().default('postgresql://postgres:postgres@localhost:5432/dropshield'),
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z
     .string()
@@ -32,6 +33,19 @@ const envSchema = z.object({
     .transform((val) => parseInt(val, 10))
     .pipe(z.number().positive().max(65535)),
   REDIS_PASSWORD: z.string().optional().default(''),
+  RABBITMQ_DEFAULT_USER: z.string().default('guest'),
+  RABBITMQ_DEFAULT_PASS: z.string().default('guest'),
+  RABBITMQ_HOST: z.string().default('localhost'),
+  RABBITMQ_PORT: z
+    .string()
+    .default('5672')
+    .transform((val) => parseInt(val, 10))
+    .pipe(z.number().positive().max(65535)),
+  RABBITMQ_MANAGEMENT_PORT: z
+    .string()
+    .default('15672')
+    .transform((val) => parseInt(val, 10))
+    .pipe(z.number().positive().max(65535)),
   RABBITMQ_URL: z.string().default('amqp://guest:guest@localhost:5672'),
   JWT_SECRET: z.string().default('dev_jwt_secret_dropshield_default_development_key_32chars'),
   JWT_EXPIRES_IN: z.string().default('1d'),

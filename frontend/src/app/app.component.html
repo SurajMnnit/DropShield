@@ -24,17 +24,17 @@
           <span class="text-xs uppercase tracking-wider font-semibold text-teal-400">Current Milestone</span>
           <h2 class="text-xl md:text-2xl font-semibold text-white mt-1">{{ phase() }}</h2>
           <p class="text-sm text-slate-400 mt-2 max-w-2xl">
-            Monorepo initialized with npm workspaces, strict TypeScript configurations, backend health endpoints, and independent Angular frontend.
+            Containerized infrastructure configured via Docker Compose: PostgreSQL 16 (ACID data), Redis 7 (AOF in-memory engine), and RabbitMQ 3.13 (durable message broker with management dashboard).
           </p>
         </div>
         <div class="px-4 py-2 rounded-lg bg-slate-800/80 border border-slate-700 text-xs text-slate-300 font-mono">
-          Progress: 1/8 Phases Completed
+          Progress: 2/8 Phases Completed
         </div>
       </div>
     </div>
 
     <div>
-      <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">Core Architecture Matrix</h3>
+      <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">Core Infrastructure & Technology Matrix</h3>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         @for (item of techStack; track item.name) {
           <div class="p-5 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition">
@@ -58,7 +58,7 @@
       <span>•</span>
       <span class="text-slate-400">Angular 19</span>
       <span>•</span>
-      <span class="text-slate-400">Strict TypeScript</span>
+      <span class="text-slate-400">Docker Infrastructure</span>
     </div>
   </footer>
 </main>

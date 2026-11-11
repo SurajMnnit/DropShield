@@ -9,6 +9,10 @@
     "frontend"
   ],
   "scripts": {
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs -f",
+    "infra:ps": "docker compose ps",
     "dev:frontend": "npm run start --workspace=frontend",
     "dev:backend": "npm run dev --workspace=backend",
     "dev:worker": "npm run dev:worker --workspace=backend",

@@ -1,27 +1,27 @@
 # 🛡️ DropShield
 
-> **DropShield** is a distributed, high-concurrency event ticket booking platform designed to withstand flash-crowd demand spikes (e.g., stadium-scale concert ticket drops) without overselling, race conditions, or database degradation.
+> **DropShield** is a distributed event ticket booking platform designed to manage high-demand flash crowd booking traffic without overselling, race conditions, or database degradation.
 
 ---
 
 ## 🏗️ Architecture Overview
 
-DropShield adopts a high-throughput, memory-first architecture with asynchronous persistence:
+DropShield employs a multi-tiered architecture with in-memory reservation and asynchronous persistent processing:
 
 ```mermaid
 flowchart TD
-    Client["Angular 19+ Client"] -->|HTTPS / REST| API["Express.js API Gateway"]
-    API -->|Atomic Decr / Lua Script| Redis[("Redis Inventory Engine\nTTL Leases & Idempotency")]
-    API -->|Durable Publish| RMQ["RabbitMQ Message Broker"]
+    Client["Angular 19+ Client"] -->|HTTP / REST| API["Express.js API Gateway"]
+    API -->|Atomic Decr / Lua Script| Redis[("Redis 7 Inventory Engine\nTTL Leases & Idempotency")]
+    API -->|Durable Publish| RMQ["RabbitMQ 3.13 Message Broker"]
     RMQ -->|Asynchronous Consume| Worker["Background Worker Process"]
     Worker -->|ACID Transaction| DB[("PostgreSQL 16\nConfirmed Bookings")]
     Worker -->|Reconciliation / Events| Redis
 ```
 
 ### Architectural Principles
-- **Fast-Path Memory Allocation**: High-concurrency ticket reservations are acquired atomically in Redis via Lua scripts, bypassing relational database locking during peak traffic.
-- **Asynchronous Order Processing**: RabbitMQ buffers requests to ensure predictable, level load on PostgreSQL.
-- **Zero-Overselling Guarantee**: Enforced by atomic inventory decrements, monotonic sequence checks, and strict database constraints.
+- **In-Memory Fast Path**: Ticket reservations are claimed atomically in Redis before touching the relational database.
+- **Asynchronous Order Processing**: RabbitMQ buffers booking events to ensure a predictable, steady write workload on PostgreSQL.
+- **Zero-Overselling Guarantee**: Enforced by atomic inventory decrements, monotonic sequence checks, and database constraints.
 - **Idempotency**: Requests carry idempotency keys ensuring at-most-once reservation semantics even under network retries.
 
 ---
@@ -30,15 +30,15 @@ flowchart TD
 
 | Layer | Technology | Purpose |
 | :--- | :--- | :--- |
-| **Frontend** | Angular 19+, TypeScript, RxJS | Reactive, high-performance user booking interface |
+| **Frontend** | Angular 19+, TypeScript, RxJS | Reactive user booking interface |
 | **Styling** | Tailwind CSS | Modern, utility-first responsive styling |
-| **Backend API** | Node.js, Express.js, TypeScript | High-throughput REST API gateway |
-| **Validation** | Zod | Runtime environment variable and schema validation |
-| **Database** | PostgreSQL 16 (`pg` driver) | ACID persistent storage for finalized bookings and events |
-| **Cache & Locks** | Redis 7 + Lua Scripts | Atomic inventory engine, distributed locks, TTL leases |
-| **Message Broker**| RabbitMQ 3.13 | Durable, reliable asynchronous message queue |
-| **Testing** | Jest, Supertest, k6 | Unit, integration, and high-concurrency load testing |
-| **Infrastructure**| Docker, Docker Compose | Containerized local and production runtime |
+| **Backend API** | Node.js, Express.js, TypeScript | REST API gateway |
+| **Validation** | Zod | Runtime environment variable and payload schema validation |
+| **Database** | PostgreSQL 16 (`pg` driver) | ACID persistent relational storage |
+| **Cache & Engine** | Redis 7 + Lua Scripts | In-memory inventory engine, distributed locks, TTL leases |
+| **Message Broker**| RabbitMQ 3.13 (Management) | Durable, asynchronous message broker with monitoring dashboard |
+| **Testing** | Jest, Supertest | Unit, integration, and endpoint testing |
+| **Infrastructure**| Docker, Docker Compose | Isolated multi-container environment |
 
 ---
 
@@ -49,7 +49,7 @@ DropShield is organized as an **npm workspaces monorepo**:
 ```
 DropShield/
 |-- frontend/                 # Angular 19+ Single Page Application
-|   |-- src/                  # App components, styles, environments
+|   |-- src/                  # App components, styles, configurations
 |   |-- angular.json          # Angular CLI workspace configuration
 |   |-- package.json          # Frontend dependencies & scripts
 |   |-- tsconfig.json         # Strict TypeScript compiler options
@@ -57,7 +57,7 @@ DropShield/
 |-- backend/                  # Node.js + Express API & Background Worker
 |   |-- src/
 |   |   |-- config/           # Zod environment validation & runtime config
-|   |   |-- middleware/       # Error handling, logging, rate limiting
+|   |   |-- middleware/       # Error handling, request logging
 |   |   |-- routes/           # REST endpoints (e.g. /health)
 |   |   |-- services/         # Domain business logic (Phase 4 & 5)
 |   |   |-- queues/           # RabbitMQ publishers & consumers (Phase 5)
@@ -84,7 +84,7 @@ DropShield/
 |
 |-- scripts/                  # Development and CI/CD utility scripts
 |-- docs/                     # Architectural documents & design specs
-|-- docker-compose.yml        # Multi-container orchestration (Phase 2)
+|-- docker-compose.yml        # Multi-container orchestration (Postgres, Redis, RabbitMQ)
 |-- package.json              # Monorepo root workspace manifest
 |-- .gitignore                # Git ignore rules (secrets, dist, node_modules)
 |-- .env.example              # Documented environment template
@@ -97,51 +97,111 @@ DropShield/
 ## 🗺️ Development Roadmap
 
 - [x] **Phase 01: Repository & Monorepo Setup** (Workspace, Angular 19, Express, TypeScript, Git configuration)
-- [ ] **Phase 02: Infrastructure Setup** (PostgreSQL, Redis, RabbitMQ, Docker Compose)
+- [x] **Phase 02: Infrastructure Setup** (PostgreSQL, Redis, RabbitMQ, Docker Compose)
 - [ ] **Phase 03: Database Engineering** (Migrations, schema, indexes, transactional constraints)
 - [ ] **Phase 04: Redis Inventory Engine** (Lua scripts, atomic reservations, TTL and idempotency)
 - [ ] **Phase 05: Backend Processing** (API intake, RabbitMQ, background workers)
 - [ ] **Phase 06: Authentication & Frontend** (RBAC, JWT cookies, Angular booking interface)
 - [ ] **Phase 07: Reliability Engineering** (Retries, recovery, failure injection and reconciliation)
-- [ ] **Phase 08: Performance Engineering** (k6, 10K+ RPS experiments, Prometheus and Grafana)
+- [ ] **Phase 08: Performance Engineering** (k6, experiments, Prometheus and Grafana)
 
 ---
 
-## 🚀 Getting Started
+## 🐳 Infrastructure & Local Development
+
+DropShield uses **Docker Compose** to provision and orchestrate local infrastructure services with strict isolation and health monitoring.
 
 ### Prerequisites
 - **Node.js**: `v20.11.0` or higher (Active LTS recommended)
 - **npm**: `v10.0.0` or higher
-- **Docker & Docker Compose**: (Required for Phase 2+)
-
-### Installation
-Clone the repository and install all monorepo dependencies:
-
-```bash
-# Clone the repository
-git clone https://github.com/SurajMnnit/DropShield.git
-cd DropShield
-
-# Install dependencies across all workspaces
-npm install
-```
+- **Docker Desktop** (or Docker Engine 24+) with the Docker Compose plugin
 
 ### Environment Configuration
-Copy `.env.example` to `.env` in the root directory:
+Copy `.env.example` to create your local `.env` file:
 
 ```bash
+# On Linux/macOS
 cp .env.example .env
+
+# On Windows PowerShell
+Copy-Item .env.example .env
+```
+
+### Starting the Infrastructure
+Start all core infrastructure containers in detached mode:
+
+```bash
+npm run infra:up
+# Equivalent to: docker compose up -d
+```
+
+### Stopping the Infrastructure
+Stop containers while **preserving** persistent volume data:
+
+```bash
+npm run infra:down
+# Equivalent to: docker compose down
+```
+
+### Inspecting Infrastructure Health & Logs
+```bash
+# View real-time container status and health checks
+npm run infra:ps
+
+# Stream live multi-service logs
+npm run infra:logs
 ```
 
 ---
 
-## 💻 Available Scripts
+## 🔌 Local Service Endpoints & Connection Details
 
-All scripts can be run from the root directory:
+All ports are bound exclusively to `127.0.0.1` to prevent unauthorized external network exposure:
 
-### Development
+| Service | Container Name | Host Port | Internal Port | Protocol | Default Credentials | Connection String |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **PostgreSQL 16** | `dropshield-postgres` | `5432` | `5432` | TCP / PostgreSQL | `postgres` / `postgres` | `postgresql://postgres:postgres@localhost:5432/dropshield` |
+| **Redis 7 (AOF)** | `dropshield-redis` | `6379` | `6379` | Redis TCP | *(None / dev default)* | `redis://localhost:6379` |
+| **RabbitMQ AMQP** | `dropshield-rabbitmq` | `5672` | `5672` | AMQP 0-9-1 | `guest` / `guest` | `amqp://guest:guest@localhost:5672` |
+| **RabbitMQ UI** | `dropshield-rabbitmq` | `15672` | `15672` | HTTP | `guest` / `guest` | `http://localhost:15672` |
+
+### RabbitMQ Management Dashboard
+Open [http://localhost:15672](http://localhost:15672) in your browser:
+- **Username**: `guest`
+- **Password**: `guest`
+
+Use this console to monitor connection pools, exchanges, message queue depth, and consumer acknowledgements.
+
+---
+
+## ⚠️ Resetting Development Data
+
+> [!CAUTION]
+> **Data Destruction Warning**: Resetting volumes deletes all persisted database rows, Redis cache entries, and RabbitMQ queues permanently. Never run this on a production system.
+
+To completely reset all local development data and re-initialize empty volumes:
+
 ```bash
-# Run the Frontend (Angular development server on http://localhost:4200)
+# Stop containers and remove named volumes
+docker compose down -v
+```
+
+Persistent named volumes managed by Compose:
+- `dropshield_postgres_data` (maps to `/var/lib/postgresql/data`)
+- `dropshield_redis_data` (maps to `/data`)
+- `dropshield_rabbitmq_data` (maps to `/var/lib/rabbitmq`)
+
+---
+
+## 💻 Application Scripts
+
+All development and test commands can be executed from the root directory:
+
+```bash
+# Install all workspace dependencies
+npm install
+
+# Run the Frontend (Angular 19 on http://localhost:4200)
 npm run dev:frontend
 
 # Run the Backend API (Express on http://localhost:4000)
@@ -149,22 +209,11 @@ npm run dev:backend
 
 # Run the Asynchronous Background Worker
 npm run dev:worker
-```
 
-### Production Build
-```bash
-# Build all workspaces (shared -> backend -> frontend)
+# Build all monorepo workspaces (shared -> backend -> frontend)
 npm run build
 
-# Build individual workspaces
-npm run build:shared
-npm run build:backend
-npm run build:frontend
-```
-
-### Testing & Quality
-```bash
-# Run unit & integration test suites
+# Run unit & integration tests
 npm test
 
 # Run ESLint across codebases
@@ -178,7 +227,7 @@ npm run format
 
 ## 🔍 Health Check Verification
 
-The backend exposes a health check endpoint for container probes and operational monitoring:
+The backend provides health check endpoints for operational probes:
 
 - `GET http://localhost:4000/health`
 - `GET http://localhost:4000/api/health`

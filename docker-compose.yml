@@ -1,9 +1,14 @@
 version: '3.8'
 
-# DropShield Distributed System Infrastructure
-# Phase 2 will fully configure persistent volumes, healthchecks, and resource limits.
+# ==============================================================================
+# DropShield - Distributed High-Concurrency Infrastructure
+# Phase 2: PostgreSQL, Redis, RabbitMQ Orchestration
+# ==============================================================================
 
 services:
+  # ----------------------------------------------------------------------------
+  # PostgreSQL 16 - ACID Persistent Relational Database
+  # ----------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
     container_name: dropshield-postgres
@@ -13,44 +18,82 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Bind exclusively to 127.0.0.1 to avoid exposing to external interfaces
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - dropshield-net
+      - dropshield-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-dropshield}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
+  # ----------------------------------------------------------------------------
+  # Redis 7 - In-Memory Inventory Engine with AOF Durability
+  # ----------------------------------------------------------------------------
   redis:
     image: redis:7-alpine
     container_name: dropshield-redis
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      # Bind exclusively to 127.0.0.1 to prevent external cache exposure
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     networks:
-      - dropshield-net
+      - dropshield-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
+  # ----------------------------------------------------------------------------
+  # RabbitMQ 3.13 - Durable Asynchronous Message Broker
+  # ----------------------------------------------------------------------------
   rabbitmq:
-    image: rabbitmq:3.13-management-alpine
+    image: rabbitmq:3-management-alpine
     container_name: dropshield-rabbitmq
     restart: unless-stopped
-    ports:
-      - "5672:5672"   # AMQP protocol
-      - "15672:15672" # Management dashboard
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
+    ports:
+      # 5672: AMQP protocol for producer/consumer channels (localhost only)
+      - "127.0.0.1:${RABBITMQ_PORT:-5672}:5672"
+      # 15672: HTTP Management Dashboard (localhost only)
+      - "127.0.0.1:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
-      - dropshield-net
+      - dropshield-network
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
 
+# ------------------------------------------------------------------------------
+# Isolated Bridge Network
+# ------------------------------------------------------------------------------
 networks:
-  dropshield-net:
+  dropshield-network:
+    name: dropshield-network
     driver: bridge
 
+# ------------------------------------------------------------------------------
+# Persistent Named Volumes (Preserved across container restarts & down)
+# ------------------------------------------------------------------------------
 volumes:
   postgres_data:
+    name: dropshield_postgres_data
   redis_data:
+    name: dropshield_redis_data
   rabbitmq_data:
+    name: dropshield_rabbitmq_data
