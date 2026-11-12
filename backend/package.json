@@ -10,6 +10,10 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "start:worker": "node dist/worker.js",
+    "db:migrate": "tsx src/scripts/migrate.ts up",
+    "db:migrate:status": "tsx src/scripts/migrate.ts status",
+    "db:rollback": "tsx src/scripts/migrate.ts down",
+    "db:seed": "tsx src/scripts/seed.ts",
     "test": "node --experimental-vm-modules ../node_modules/jest/bin/jest.js --config jest.config.cjs",
     "lint": "eslint src"
   },

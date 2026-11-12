@@ -26,6 +26,27 @@ const envSchema = z.object({
   POSTGRES_USER: z.string().default('postgres'),
   POSTGRES_PASSWORD: z.string().default('postgres'),
   DATABASE_URL: z.string().default('postgresql://postgres:postgres@localhost:5432/dropshield'),
+  DIRECT_DATABASE_URL: z.string().optional(),
+  DB_POOL_MAX: z
+    .string()
+    .default('20')
+    .transform((val) => parseInt(val, 10))
+    .pipe(z.number().positive().max(100)),
+  DB_POOL_MIN: z
+    .string()
+    .default('2')
+    .transform((val) => parseInt(val, 10))
+    .pipe(z.number().nonnegative().max(50)),
+  DB_CONNECTION_TIMEOUT_MS: z
+    .string()
+    .default('10000')
+    .transform((val) => parseInt(val, 10))
+    .pipe(z.number().positive()),
+  DB_IDLE_TIMEOUT_MS: z
+    .string()
+    .default('30000')
+    .transform((val) => parseInt(val, 10))
+    .pipe(z.number().positive()),
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z
     .string()

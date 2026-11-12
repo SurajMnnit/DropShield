@@ -250,5 +250,32 @@ The backend provides health check endpoints for operational probes:
 
 ---
 
+## 🗄️ Database Management & Migrations (Phase 3)
+
+DropShield uses **Neon Serverless PostgreSQL** with an advisory-locked, transactional migration runner.
+
+### Database Architecture & Connection Settings
+- **`DATABASE_URL`**: Pooled connection string (`-pooler.neon.tech`) for application queries and runtime connection pooling.
+- **`DIRECT_DATABASE_URL`**: Direct unpooled connection string (`.neon.tech`) for transactional migrations and advisory locks.
+
+### Database Commands
+```bash
+# Check status of all migrations
+npm run db:migrate:status
+
+# Apply pending migrations
+npm run db:migrate
+
+# Rollback single latest migration
+npm run db:rollback
+
+# Seed development dataset (admin, buyers, venues, physical & session seats)
+npm run db:seed
+```
+
+Comprehensive ER diagrams, table schemas, constraints, and concurrency strategies are documented in [docs/database-design.md](docs/database-design.md).
+
+---
+
 ## 🛡️ License
 MIT License. Copyright © 2026 DropShield Contributors.
