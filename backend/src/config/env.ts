@@ -53,7 +53,25 @@ const envSchema = z.object({
     .default('6379')
     .transform((val) => parseInt(val, 10))
     .pipe(z.number().positive().max(65535)),
+  REDIS_USERNAME: z.string().optional().default(''),
   REDIS_PASSWORD: z.string().optional().default(''),
+  REDIS_CONNECT_TIMEOUT_MS: z
+    .string()
+    .default('5000')
+    .transform((val) => parseInt(val, 10))
+    .pipe(z.number().positive()),
+  REDIS_COMMAND_TIMEOUT_MS: z
+    .string()
+    .default('3000')
+    .transform((val) => parseInt(val, 10))
+    .pipe(z.number().positive()),
+  REDIS_RETRY_MAX_DELAY_MS: z
+    .string()
+    .default('3000')
+    .transform((val) => parseInt(val, 10))
+    .pipe(z.number().positive()),
+  REDIS_KEY_PREFIX: z.string().default('dropshield'),
+  REDIS_TLS: z.string().default('false').transform((val) => val.toLowerCase() === 'true'),
   RABBITMQ_DEFAULT_USER: z.string().default('guest'),
   RABBITMQ_DEFAULT_PASS: z.string().default('guest'),
   RABBITMQ_HOST: z.string().default('localhost'),

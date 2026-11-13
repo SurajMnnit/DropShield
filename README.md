@@ -98,8 +98,8 @@ DropShield/
 
 - [x] **Phase 01: Repository & Monorepo Setup** (Workspace, Angular 19, Express, TypeScript, Git configuration)
 - [x] **Phase 02: Infrastructure Setup** (PostgreSQL, Redis, RabbitMQ, Docker Compose)
-- [ ] **Phase 03: Database Engineering** (Migrations, schema, indexes, transactional constraints)
-- [ ] **Phase 04: Redis Inventory Engine** (Lua scripts, atomic reservations, TTL and idempotency)
+- [x] **Phase 03: Database Engineering** (Migrations, schema, indexes, transactional constraints)
+- [x] **Phase 04: Redis Inventory Engine** (Lua scripts, atomic reservations, TTL and idempotency)
 - [ ] **Phase 05: Backend Processing** (API intake, RabbitMQ, background workers)
 - [ ] **Phase 06: Authentication & Frontend** (RBAC, JWT cookies, Angular booking interface)
 - [ ] **Phase 07: Reliability Engineering** (Retries, recovery, failure injection and reconciliation)
@@ -274,6 +274,27 @@ npm run db:seed
 ```
 
 Comprehensive ER diagrams, table schemas, constraints, and concurrency strategies are documented in [docs/database-design.md](docs/database-design.md).
+
+---
+
+## ⚡ Redis Atomic Inventory Engine (Phase 4)
+
+DropShield leverages **Redis 7+** with server-side Lua scripts as an in-memory allocation shield to prevent database contention and guarantee zero overselling during high-concurrency ticket drops.
+
+### Architectural Highlights:
+- **Server-Side Lua Atomicity**: All seat reservation operations (`hold_seats.lua`, `release_seats.lua`, `confirm_seats.lua`) execute atomically inside Redis, preventing partial holds, race conditions, and overselling.
+- **Redis Cluster Compatible**: All keys use `{sessionId}` hash tags (e.g. `dropshield:{sessionId}:seats`) guaranteeing single-slot placement and zero `CROSSSLOT` errors across sharded clusters.
+- **Request-Level Idempotency**: Cryptographic SHA-256 payload hashing ensures cached responses are replayed on identical retries while payload mismatches trigger immediate conflict errors.
+- **Durable Sorted Set Expiration**: Reservation leases are indexed in `dropshield:{sessionId}:reservation_expirations` Sorted Sets rather than relying on lossy keyspace notifications, ensuring seamless recovery of expired holds even across worker crashes.
+- **Dual-Engine Consistency**: Redis acts as the hot-path allocation filter, protecting PostgreSQL from high write concurrency while PostgreSQL remains the immutable ACID system of record.
+
+### Running Phase 4 Redis Tests
+```bash
+# Run unit and integration tests against local Redis
+npm test -- backend/tests/redis-inventory.test.ts backend/tests/redis-failure.test.ts
+```
+
+Detailed key specifications, Lua script workflows, and recovery scenarios are documented in [docs/redis-inventory-design.md](docs/redis-inventory-design.md).
 
 ---
 
