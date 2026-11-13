@@ -56,3 +56,23 @@ export interface ReservationResponse {
   expiresAt: string;
   message?: string;
 }
+
+export interface BookingRequestedEventPayload {
+  reservationId: string;
+  sessionId: string;
+  userId: string;
+  seatIds: string[];
+  idempotencyKey: string;
+  expiresAt: string;
+  totalAmountMinor: number;
+  currency: string;
+}
+
+export interface BookingRequestedEvent {
+  eventId: string;
+  eventType: 'booking.requested';
+  version: 'v1';
+  timestamp: string;
+  payload: BookingRequestedEventPayload;
+  retryCount?: number;
+}

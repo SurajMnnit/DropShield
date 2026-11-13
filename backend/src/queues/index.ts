@@ -1,3 +1,2 @@
-// RabbitMQ message queue producers and consumer channels
-// Implemented in Phase 5
-export {};
+export * from './topology.js';
+export * from './booking.consumer.js';

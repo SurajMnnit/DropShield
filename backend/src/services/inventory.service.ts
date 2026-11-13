@@ -39,7 +39,7 @@ export interface ReleaseSeatsParams {
   reservationId: string;
   userId?: string;
   idempotencyKey?: string;
-  reason?: 'EXPIRED' | 'CANCELLED' | 'MANUAL';
+  reason?: 'EXPIRED' | 'CANCELLED' | 'MANUAL' | 'COMPENSATION_ROLLBACK';
 }
 
 export interface ReleaseSeatsResult {

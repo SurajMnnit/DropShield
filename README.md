@@ -100,7 +100,7 @@ DropShield/
 - [x] **Phase 02: Infrastructure Setup** (PostgreSQL, Redis, RabbitMQ, Docker Compose)
 - [x] **Phase 03: Database Engineering** (Migrations, schema, indexes, transactional constraints)
 - [x] **Phase 04: Redis Inventory Engine** (Lua scripts, atomic reservations, TTL and idempotency)
-- [ ] **Phase 05: Backend Processing** (API intake, RabbitMQ, background workers)
+- [x] **Phase 05: Backend Processing** (API intake, RabbitMQ, background workers)
 - [ ] **Phase 06: Authentication & Frontend** (RBAC, JWT cookies, Angular booking interface)
 - [ ] **Phase 07: Reliability Engineering** (Retries, recovery, failure injection and reconciliation)
 - [ ] **Phase 08: Performance Engineering** (k6, experiments, Prometheus and Grafana)
@@ -295,6 +295,28 @@ npm test -- backend/tests/redis-inventory.test.ts backend/tests/redis-failure.te
 ```
 
 Detailed key specifications, Lua script workflows, and recovery scenarios are documented in [docs/redis-inventory-design.md](docs/redis-inventory-design.md).
+
+---
+
+## 📬 Asynchronous Booking Processing Engine (Phase 5)
+
+Phase 5 introduces a decoupled asynchronous intake pipeline combining **Express.js**, the **Transactional Outbox Pattern**, and **RabbitMQ** with progressive retry delay queues and dead-letter routing.
+
+### Architectural Highlights:
+- **Immediate HTTP 202 Accepted Intake**: The API completes atomic Redis holds and commits the reservation alongside its outbox event in PostgreSQL before returning HTTP 202, eliminating client timeouts during traffic surges.
+- **Transactional Outbox**: Ensures 100% reliable event dispatch without dual-write race conditions. Publishers claim pending events using `FOR UPDATE SKIP LOCKED`.
+- **Publisher Confirms & Dead-Letter Routing**: All messages are published with broker confirmation (`ConfirmChannel`) and persistent delivery mode. Poison pills and exceeded retries route to `dropshield.booking.dead`.
+- **Progressive Delay Retry Queues**: Bounded exponential backoff via TTL queues (`booking.retry.1` at 2s, `booking.retry.2` at 5s, `booking.retry.3` at 10s) prevents stampedes.
+- **Idempotent Background Worker**: A dedicated background worker runtime (`src/worker.ts`) consumes messages with bounded prefetch (`prefetch(10)`), handles duplicate redeliveries safely, reclaims expired queue holds, and acknowledges messages only after database commit.
+- **Automatic Redis Compensation**: If a database transaction fails after an in-memory hold, the engine automatically rolls back the hold in Redis to prevent orphaned inventory.
+
+### Running Phase 5 Tests
+```bash
+# Run Phase 5 integration tests against local RabbitMQ, Redis, and PostgreSQL
+npm test -- backend/tests/rabbitmq-connection.test.ts backend/tests/outbox-publisher.test.ts backend/tests/booking-api.test.ts backend/tests/booking-worker.test.ts
+```
+
+Comprehensive architecture, message contracts, and recovery matrices are documented in [docs/booking-processing-architecture.md](docs/booking-processing-architecture.md).
 
 ---
 

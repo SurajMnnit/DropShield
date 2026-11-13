@@ -14,11 +14,12 @@
     "db:migrate:status": "tsx src/scripts/migrate.ts status",
     "db:rollback": "tsx src/scripts/migrate.ts down",
     "db:seed": "tsx src/scripts/seed.ts",
-    "test": "node --experimental-vm-modules ../node_modules/jest/bin/jest.js --config jest.config.cjs",
+    "test": "node --experimental-vm-modules ../node_modules/jest/bin/jest.js --config jest.config.cjs --runInBand --forceExit",
     "lint": "eslint src"
   },
   "dependencies": {
     "@dropshield/shared": "*",
+    "amqplib": "^2.3.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
@@ -28,6 +29,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/amqplib": "^0.10.8",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/ioredis": "^4.28.10",

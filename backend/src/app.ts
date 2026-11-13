@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { env } from './config/env.js';
 import { healthRouter } from './routes/health.routes.js';
+import { reservationsRouter } from './routes/reservations.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { requestLogger } from './middleware/requestLogger.js';
 
@@ -24,6 +25,9 @@ export const createApp = (): express.Application => {
   // Health check routes
   app.use('/health', healthRouter);
   app.use('/api/health', healthRouter);
+
+  // Phase 5 API Intake routes
+  app.use('/api/v1', reservationsRouter);
 
   // Root welcome route
   app.get('/', (_req, res) => {

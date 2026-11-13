@@ -19,9 +19,17 @@ function createPoolConfig(connectionString: string, isPooledRuntime = true): pg.
   };
 }
 
+function getRuntimeConnectionString(): string {
+  if (process.env.NODE_ENV === 'test' && process.env.TEST_DATABASE_URL) {
+    assertTestDatabaseUrl(process.env.TEST_DATABASE_URL);
+    return process.env.TEST_DATABASE_URL;
+  }
+  return env.DATABASE_URL;
+}
+
 // Runtime application pool uses DATABASE_URL (pooled endpoint on Neon)
-// Runtime pool uses DATABASE_URL (pooled endpoint on Neon) with strict TLS verification
-export const dbPool = new Pool(createPoolConfig(env.DATABASE_URL, true));
+// When NODE_ENV === 'test', routes to explicit validated TEST_DATABASE_URL
+export const dbPool = new Pool(createPoolConfig(getRuntimeConnectionString(), true));
 
 
 dbPool.on('error', (err) => {

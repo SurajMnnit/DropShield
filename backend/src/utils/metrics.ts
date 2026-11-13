@@ -23,6 +23,10 @@ class MetricsRegistry {
     this.timers.set(metric, samples);
   }
 
+  recordTiming(metric: string, durationMs: number): void {
+    this.recordDuration(metric, durationMs);
+  }
+
   getCounter(metric: string): number {
     return this.counters.get(metric) || 0;
   }
