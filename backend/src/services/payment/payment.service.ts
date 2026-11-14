@@ -172,12 +172,25 @@ export class PaymentService {
         return { bookingId: existingBooking.rows[0].id, paymentId };
       }
 
-      if (reservation.status !== 'PENDING') {
-        throw new Error(`RESERVATION_ALREADY_${reservation.status}`);
-      }
+      if (reservation.status !== 'PENDING' || new Date() >= new Date(reservation.expires_at)) {
+        const isExpired = reservation.status === 'EXPIRED' || new Date() >= new Date(reservation.expires_at);
+        const reason = isExpired ? 'RESERVATION_EXPIRED' : `RESERVATION_ALREADY_${reservation.status}`;
 
-      if (new Date() >= new Date(reservation.expires_at)) {
-        throw new Error('RESERVATION_EXPIRED');
+        await client.query('ROLLBACK');
+
+        // Post-expiry payment handling: Trigger immediate provider refund
+        try {
+          await this.provider.processRefund({
+            paymentId,
+            providerPaymentId,
+            amountMinor,
+            reason: `Post-expiry automatic refund: ${reason}`,
+          });
+        } catch (rfdErr) {
+          logger.warn(`Automatic refund error for expired reservation ${reservationId}:`, rfdErr);
+        }
+
+        throw new Error(reason);
       }
 
       const sessionId = reservation.event_session_id;
@@ -338,7 +351,7 @@ export class PaymentService {
         `SELECT b.id, b.user_id, b.status, b.total_amount_minor, b.currency,
                 p.id as payment_id, p.provider_payment_id
          FROM bookings b
-         JOIN payments p ON p.booking_id = b.id AND p.status = 'SUCCEEDED'
+         JOIN payments p ON p.booking_id = b.id
          WHERE b.id = $1
          FOR UPDATE;`,
         [bookingId]
@@ -354,7 +367,13 @@ export class PaymentService {
       }
 
       if (booking.status === 'REFUNDED') {
-        throw new Error('BOOKING_ALREADY_REFUNDED');
+        const existingLedger = await client.query(
+          `SELECT reference FROM transaction_ledger WHERE booking_id = $1 AND transaction_type = 'REFUND' ORDER BY created_at DESC LIMIT 1;`,
+          [bookingId]
+        );
+        const refId = existingLedger.rows[0]?.reference?.replace(/^REF-RFD-/, '') || 'already_refunded';
+        await client.query('COMMIT');
+        return { refundId: refId };
       }
 
       // 1. Call payment provider refund

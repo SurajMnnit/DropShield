@@ -20,9 +20,10 @@ function createPoolConfig(connectionString: string, isPooledRuntime = true): pg.
 }
 
 function getRuntimeConnectionString(): string {
-  if (process.env.NODE_ENV === 'test' && process.env.TEST_DATABASE_URL) {
-    assertTestDatabaseUrl(process.env.TEST_DATABASE_URL);
-    return process.env.TEST_DATABASE_URL;
+  if (process.env.NODE_ENV === 'test') {
+    const testUrl = process.env.TEST_DATABASE_URL || 'postgresql://postgres:postgres@localhost:5433/dropshield_test';
+    assertTestDatabaseUrl(testUrl);
+    return testUrl;
   }
   return env.DATABASE_URL;
 }

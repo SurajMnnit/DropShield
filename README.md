@@ -355,5 +355,40 @@ Comprehensive architecture, security protocols, and payment sequence diagrams ar
 
 ---
 
+## 🔁 Phase 7: Reliability, Recovery & Failure Injection
+
+DropShield includes a comprehensive self-healing reliability and recovery subsystem to survive infrastructure disruptions, process crashes, and concurrent race conditions:
+
+- **Distributed Reconciliation Engine**:
+  - Single-leader cluster coordination via PostgreSQL transactional advisory locks (`pg_try_advisory_xact_lock(740001)`).
+  - Periodic and on-demand detection and repair of 6 core discrepancy categories across PostgreSQL, Redis, and RabbitMQ.
+  - Non-destructive dry-run mode for operations and audit validation.
+- **Redis Failure & State Recovery**:
+  - Full session inventory reconstitution from PostgreSQL (`reconstructSessionInventory`) following cache flush or restart.
+  - Stale expiry protection: Lua scripts prevent expired lease cleanups from overwriting confirmed or re-reserved seats.
+  - Exponential backoff with randomized jitter for transient failure recovery.
+- **RabbitMQ & Worker Failure Resilience**:
+  - Dead-letter queue (DLQ) non-destructive inspection (`inspectDeadLetterQueue`).
+  - Safe, idempotent message replay (`replayDeadLetterMessages`) that checks PostgreSQL status before re-dispatching, purging obsolete or expired records.
+  - Consumer crash simulation and graceful shutdown mechanics.
+- **Payment & Financial Consistency Hardening**:
+  - Webhook idempotency preventing duplicate bookings or ledger rows under duplicate delivery.
+  - Graceful post-expiry payment handling with automatic refund trigger.
+  - Idempotent refund processing returning existing refund references without creating duplicate ledger records.
+- **Controlled Failure Injection Framework**:
+  - Deterministic simulation of 11 infrastructure failure points strictly gated to `NODE_ENV === 'test'`.
+- **Operational Recovery CLI**:
+  - `npm run reconcile` / `npm run reconcile:dry-run` / `npm run reconcile repair`.
+
+### Running Phase 7 Tests
+```bash
+# Run all Phase 7 reliability and failure recovery test suites
+npm test -- backend/tests/reconciliation.test.ts backend/tests/redis-recovery.test.ts backend/tests/rabbitmq-recovery.test.ts backend/tests/payment-consistency.test.ts backend/tests/concurrency-reliability.test.ts
+```
+
+Comprehensive reliability details are documented in [docs/reliability-and-recovery.md](docs/reliability-and-recovery.md).
+
+---
+
 ## 🛡️ License
 MIT License. Copyright © 2026 DropShield Contributors.

@@ -1,16 +1,25 @@
 /**
  * In-memory operational metrics counters for DropShield.
- * Provides measurements and counters for Phase 4 inventory engine observability,
- * ready for future Prometheus integration.
+ * Provides measurements, gauges, and counters for distributed inventory,
+ * asynchronous messaging, payments, and reliability reconciliation.
  */
 
 class MetricsRegistry {
   private counters: Map<string, number> = new Map();
   private timers: Map<string, number[]> = new Map();
+  private gauges: Map<string, number> = new Map();
 
   increment(metric: string, value = 1): void {
     const current = this.counters.get(metric) || 0;
     this.counters.set(metric, current + value);
+  }
+
+  setGauge(metric: string, value: number): void {
+    this.gauges.set(metric, value);
+  }
+
+  getGauge(metric: string): number {
+    return this.gauges.get(metric) || 0;
   }
 
   recordDuration(metric: string, durationMs: number): void {
@@ -43,6 +52,9 @@ class MetricsRegistry {
     for (const [key, value] of this.counters.entries()) {
       snapshot[key] = value;
     }
+    for (const [key, value] of this.gauges.entries()) {
+      snapshot[key] = value;
+    }
     for (const [key, samples] of this.timers.entries()) {
       snapshot[`${key}_avg_ms`] = this.getAverageDuration(key);
       snapshot[`${key}_samples_count`] = samples.length;
@@ -53,6 +65,7 @@ class MetricsRegistry {
   reset(): void {
     this.counters.clear();
     this.timers.clear();
+    this.gauges.clear();
   }
 }
 

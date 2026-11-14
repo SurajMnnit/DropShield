@@ -137,14 +137,24 @@ paymentsRouter.post('/payments/webhook', async (req: Request, res: Response) => 
   try {
     if (event === 'payment.succeeded') {
       const { reservationId, userId, providerPaymentId, amountMinor, currency } = data;
-      await paymentService.finalizePaymentSuccess({
-        reservationId,
-        userId,
-        providerPaymentId,
-        amountMinor,
-        currency,
-      });
-      logger.info(`Webhook successfully processed payment.succeeded for reservation ${reservationId}`);
+      try {
+        await paymentService.finalizePaymentSuccess({
+          reservationId,
+          userId,
+          providerPaymentId,
+          amountMinor,
+          currency,
+        });
+        logger.info(`Webhook successfully processed payment.succeeded for reservation ${reservationId}`);
+      } catch (finErr: unknown) {
+        const msg = finErr instanceof Error ? finErr.message : String(finErr);
+        if (msg === 'RESERVATION_EXPIRED' || msg.startsWith('RESERVATION_ALREADY')) {
+          logger.warn(`Webhook received for expired/unpayable reservation ${reservationId}. Auto-refund processed: ${msg}`);
+          res.status(200).json({ received: true, outcome: 'EXPIRED_AND_REFUNDED' });
+          return;
+        }
+        throw finErr;
+      }
     } else if (event === 'payment.failed') {
       const { reservationId, userId, reason } = data;
       await paymentService.handlePaymentFailure({

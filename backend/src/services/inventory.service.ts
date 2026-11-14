@@ -1,8 +1,10 @@
 import crypto from 'crypto';
 import type { Redis } from 'ioredis';
+import { dbPool } from '../config/database.js';
 import { getRedisClient } from '../config/redis.js';
 import { RedisKeys } from '../redis/keys.js';
 import { getLuaScripts, executeLuaScript } from '../redis/scripts.js';
+import { failureInjector } from '../testing/failure-injector.js';
 import { logger } from '../utils/logger.js';
 import { metrics } from '../utils/metrics.js';
 
@@ -118,6 +120,107 @@ export class RedisInventoryService {
   }
 
   /**
+   * Reconstitutes session inventory in Redis from PostgreSQL (source of truth).
+   * Restores session seats hash, active reservations metadata, and expiration sorted set.
+   */
+  async reconstructSessionInventory(sessionId: string): Promise<{ restoredSeats: number; restoredReservations: number }> {
+    const client = await this.getClient();
+    const seatsKey = RedisKeys.sessionSeats(sessionId);
+    const expirationsKey = RedisKeys.reservationExpirations(sessionId);
+
+    // 1. Fetch all seats for the session from PostgreSQL
+    const seatsResult = await dbPool.query<{ id: string; status: SeatStatus }>(
+      `SELECT id, status FROM session_seats WHERE event_session_id = $1;`,
+      [sessionId]
+    );
+
+    if (seatsResult.rows.length === 0) {
+      return { restoredSeats: 0, restoredReservations: 0 };
+    }
+
+    const pipeline = client.pipeline();
+    // Re-populate seat hash
+    for (const seat of seatsResult.rows) {
+      pipeline.hset(seatsKey, seat.id, seat.status);
+    }
+
+    // 2. Fetch active (unexpired) pending reservations for this session
+    const resResult = await dbPool.query<{
+      id: string;
+      user_id: string;
+      status: string;
+      created_at: Date;
+      expires_at: Date;
+    }>(
+      `SELECT id, user_id, status, created_at, expires_at
+       FROM reservations
+       WHERE event_session_id = $1 AND status = 'PENDING' AND expires_at > CURRENT_TIMESTAMP;`,
+      [sessionId]
+    );
+
+    let restoredReservations = 0;
+    for (const res of resResult.rows) {
+      const resMetaKey = RedisKeys.reservationMeta(sessionId, res.id);
+      const resSeatsKey = RedisKeys.reservationSeats(sessionId, res.id);
+      const expiresAtMs = new Date(res.expires_at).getTime();
+      const createdAtMs = new Date(res.created_at).getTime();
+
+      // Find seats for this reservation
+      const resSeatsResult = await dbPool.query<{ session_seat_id: string }>(
+        `SELECT session_seat_id FROM reservation_items WHERE reservation_id = $1;`,
+        [res.id]
+      );
+      const seatIds = resSeatsResult.rows.map((r) => r.session_seat_id);
+
+      pipeline.hmset(resMetaKey, {
+        id: res.id,
+        user_id: res.user_id,
+        status: 'HELD',
+        created_at: createdAtMs.toString(),
+        expires_at: expiresAtMs.toString(),
+        request_hash: 'reconstructed',
+        seat_count: seatIds.length.toString(),
+      });
+
+      if (seatIds.length > 0) {
+        pipeline.sadd(resSeatsKey, ...seatIds);
+      }
+      pipeline.zadd(expirationsKey, expiresAtMs, res.id);
+      restoredReservations++;
+    }
+
+    await pipeline.exec();
+    logger.info(`Reconstructed Redis inventory for session ${sessionId}: ${seatsResult.rows.length} seats, ${restoredReservations} active reservations.`);
+    return {
+      restoredSeats: seatsResult.rows.length,
+      restoredReservations,
+    };
+  }
+
+  /**
+   * Helper for executing Redis operations with exponential backoff and jitter.
+   */
+  async executeWithRetry<T>(
+    operation: () => Promise<T>,
+    maxRetries = 3,
+    baseDelayMs = 50
+  ): Promise<T> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (err) {
+        lastError = err;
+        if (attempt === maxRetries) break;
+        const jitter = Math.random() * 20;
+        const delay = Math.min(baseDelayMs * Math.pow(2, attempt) + jitter, 1000);
+        await new Promise((res) => setTimeout(res, delay));
+      }
+    }
+    throw lastError;
+  }
+
+  /**
    * Atomically reserve multiple requested seats.
    * Guarantees all-or-nothing hold semantics, idempotency, and cluster hash-tag safety.
    */
@@ -174,6 +277,8 @@ export class RedisInventoryService {
     const client = await this.getClient();
     const { holdSeats } = getLuaScripts();
 
+    await failureInjector.trigger('REDIS_HOLD_FAILURE');
+
     const result = await executeLuaScript<HoldSeatsResult>(client, holdSeats, keys, args);
 
     const duration = Date.now() - start;
@@ -219,6 +324,8 @@ export class RedisInventoryService {
     const client = await this.getClient();
     const { releaseSeats } = getLuaScripts();
 
+    await failureInjector.trigger('REDIS_RELEASE_FAILURE');
+
     const result = await executeLuaScript<ReleaseSeatsResult>(client, releaseSeats, keys, args);
 
     const duration = Date.now() - start;
@@ -257,6 +364,8 @@ export class RedisInventoryService {
 
     const client = await this.getClient();
     const { confirmSeats } = getLuaScripts();
+
+    await failureInjector.trigger('REDIS_CONFIRM_FAILURE');
 
     const result = await executeLuaScript<ConfirmSeatsResult>(client, confirmSeats, keys, args);
 

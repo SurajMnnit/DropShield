@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { failureInjector } from '../../testing/failure-injector.js';
 import type {
   PaymentProvider,
   CreatePaymentParams,
@@ -21,6 +22,9 @@ export class DevPaymentProvider implements PaymentProvider {
   readonly providerName = 'DEV_MOCK_GATEWAY';
 
   async createPayment(params: CreatePaymentParams): Promise<CreatePaymentResult> {
+    await failureInjector.trigger('PAYMENT_PROVIDER_TIMEOUT');
+    await failureInjector.trigger('PAYMENT_AMBIGUOUS_RESULT');
+
     const providerPaymentId = `mock_pay_${crypto.randomUUID()}`;
     const clientSecret = `mock_sec_${crypto.randomBytes(16).toString('hex')}`;
 

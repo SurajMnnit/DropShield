@@ -3,6 +3,7 @@ import type pg from 'pg';
 import { dbPool } from '../config/database.js';
 import { getRabbitMQConfirmChannel } from '../config/rabbitmq.js';
 import { QUEUE_CONSTANTS } from '../queues/topology.js';
+import { failureInjector } from '../testing/failure-injector.js';
 import { logger } from '../utils/logger.js';
 import { metrics } from '../utils/metrics.js';
 
@@ -124,6 +125,8 @@ export class TransactionalOutboxService {
       typeof event.payload === 'string' ? event.payload : JSON.stringify(event.payload)
     );
 
+    await failureInjector.trigger('RABBITMQ_PUBLISH_FAIL');
+
     const publishPromise = new Promise<void>((resolve, reject) => {
       const ok = channel.publish(
         exchange,
@@ -223,6 +226,7 @@ export class TransactionalOutboxService {
     if ((this.db as any).ended) {
       return { claimed: 0, published: 0, failed: 0 };
     }
+    await failureInjector.trigger('OUTBOX_PUBLISHER_CRASH');
     const events = await this.claimPendingEvents(batchSize);
     let published = 0;
     let failed = 0;

@@ -3,6 +3,7 @@ import { dbPool } from '../config/database.js';
 import { getRabbitMQConnection } from '../config/rabbitmq.js';
 import { QUEUE_CONSTANTS, assertBookingTopology } from './topology.js';
 import { RedisInventoryService } from '../services/inventory.service.js';
+import { failureInjector } from '../testing/failure-injector.js';
 import { logger } from '../utils/logger.js';
 import { metrics } from '../utils/metrics.js';
 import type { BookingRequestedEvent } from '@dropshield/shared';
@@ -185,6 +186,7 @@ export class BookingConsumer {
       }
 
       // 4. Acknowledge the RabbitMQ message ONLY AFTER the database transaction commits!
+      await failureInjector.trigger('WORKER_CRASH_BEFORE_ACK');
       this.channel?.ack(msg);
 
       const processingDuration = Date.now() - startTime;

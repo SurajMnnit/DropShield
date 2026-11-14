@@ -286,7 +286,12 @@ describe('DropShield Phase 5: Background Booking Worker & Consumer Test Suite', 
         );
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 350));
+      // Allow worker async consumer processing to complete
+      for (let i = 0; i < 20; i++) {
+        const check = await client.query('SELECT status FROM reservations WHERE id = $1;', [reservationId]);
+        if (check.rows[0]?.status === 'EXPIRED') break;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
 
       // Verify DB marked EXPIRED
       const resCheck = await client.query('SELECT status FROM reservations WHERE id = $1;', [

@@ -24,6 +24,8 @@
     "db:migrate:status": "npm run db:migrate:status --workspace=backend",
     "db:rollback": "npm run db:rollback --workspace=backend",
     "db:seed": "npm run db:seed --workspace=backend",
+    "reconcile": "npm run reconcile --workspace=backend",
+    "reconcile:dry-run": "npm run reconcile:dry-run --workspace=backend",
     "test": "npm run test:backend",
     "test:backend": "npm run test --workspace=backend",
     "lint": "npm run lint:backend && npm run lint:shared",
