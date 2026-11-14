@@ -101,7 +101,7 @@ DropShield/
 - [x] **Phase 03: Database Engineering** (Migrations, schema, indexes, transactional constraints)
 - [x] **Phase 04: Redis Inventory Engine** (Lua scripts, atomic reservations, TTL and idempotency)
 - [x] **Phase 05: Backend Processing** (API intake, RabbitMQ, background workers)
-- [ ] **Phase 06: Authentication & Frontend** (RBAC, JWT cookies, Angular booking interface)
+- [x] **Phase 06: Authentication & Frontend** (RBAC, JWT cookies, Angular booking interface)
 - [ ] **Phase 07: Reliability Engineering** (Retries, recovery, failure injection and reconciliation)
 - [ ] **Phase 08: Performance Engineering** (k6, experiments, Prometheus and Grafana)
 
@@ -317,6 +317,41 @@ npm test -- backend/tests/rabbitmq-connection.test.ts backend/tests/outbox-publi
 ```
 
 Comprehensive architecture, message contracts, and recovery matrices are documented in [docs/booking-processing-architecture.md](docs/booking-processing-architecture.md).
+
+---
+
+## 🔐 Authentication, Payment Lifecycle & Frontend UI (Phase 6)
+
+Phase 6 delivers an end-to-end ticketing experience for DropShield, connecting secure authentication, event/session discovery, real-time seat inventory mapping, payment webhooks, and an Angular 19+ reactive client application.
+
+### Key Capabilities:
+- **Hardened Authentication & RBAC**:
+  - Salting and hashing with `bcryptjs` (12 rounds).
+  - JWT access tokens stored in secure, `HttpOnly`, `SameSite` cookies.
+  - Double-Submit CSRF cookie mitigation (`XSRF-TOKEN` cookie + `x-csrf-token` header validation).
+  - Sliding-window rate limiting on authentication attempts.
+  - Strict role enforcement for `buyer` and `admin` actors.
+- **Event Discovery & Live Seat Availability**:
+  - Paginated discovery queries filtered by category.
+  - Live seat availability engine merging relational database records with in-memory Redis hold leases (`AVAILABLE`, `HELD`, `BOOKED`).
+- **Payment Lifecycle & Financial Immutability**:
+  - Pluggable `PaymentProvider` abstraction with `DevPaymentProvider` implementing HMAC-SHA256 signature verification.
+  - Atomic multi-table finalization (`bookings`, `booking_items`, `payments`, `session_seats -> BOOKED`).
+  - Immutable Financial Audit Trail: All charges and refunds append records to `transaction_ledger`, where database triggers strictly prohibit `UPDATE`, `DELETE`, and `TRUNCATE`.
+- **Responsive Angular 19+ Frontend**:
+  - 100% Standalone components and Angular Signals for reactive state management.
+  - Dark-mode design system built with Tailwind CSS.
+  - Interactive visual seating plan with section groupings, stage orientation, and real-time hold lease countdown timers.
+  - Complete booking checkout, digital ticket pass voucher, and self-service refund management.
+  - Admin management dashboard for creating events and scheduling sessions.
+
+### Running Phase 6 Tests
+```bash
+# Run Phase 6 Authentication, Discovery, and Payment Integration Tests
+npm test -- backend/tests/auth.test.ts backend/tests/events.test.ts backend/tests/payment.test.ts
+```
+
+Comprehensive architecture, security protocols, and payment sequence diagrams are documented in [docs/authentication-and-payment-architecture.md](docs/authentication-and-payment-architecture.md).
 
 ---
 

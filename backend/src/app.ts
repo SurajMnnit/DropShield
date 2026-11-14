@@ -1,9 +1,15 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
 import { healthRouter } from './routes/health.routes.js';
+import { authRouter } from './routes/auth.routes.js';
+import { eventsRouter } from './routes/events.routes.js';
+import { sessionsRouter } from './routes/sessions.routes.js';
 import { reservationsRouter } from './routes/reservations.routes.js';
+import { paymentsRouter } from './routes/payments.routes.js';
+import { bookingsRouter } from './routes/bookings.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { requestLogger } from './middleware/requestLogger.js';
 
@@ -18,6 +24,7 @@ export const createApp = (): express.Application => {
       credentials: true,
     })
   );
+  app.use(cookieParser());
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(requestLogger);
@@ -26,8 +33,13 @@ export const createApp = (): express.Application => {
   app.use('/health', healthRouter);
   app.use('/api/health', healthRouter);
 
-  // Phase 5 API Intake routes
+  // API v1 Routes
+  app.use('/api/v1/auth', authRouter);
+  app.use('/api/v1', eventsRouter);
+  app.use('/api/v1', sessionsRouter);
   app.use('/api/v1', reservationsRouter);
+  app.use('/api/v1', paymentsRouter);
+  app.use('/api/v1', bookingsRouter);
 
   // Root welcome route
   app.get('/', (_req, res) => {
